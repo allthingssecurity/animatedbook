@@ -8,7 +8,7 @@ import * as pc from 'playcanvas';
 // State
 const state = {
     app: null, pdfDoc: null, pages: [], currentPage: 0, totalPages: 0,
-    isPlaying: false, isReading: false, readingSpeed: 1, autoFlip: true,
+    isPlaying: false, isReading: false, readingSpeed: 0.5, autoFlip: true,
     discussionMode: true, autoplayOnLoad: true, ttsEnabled: false, characterStyle: 'default',
     bookEntity: null, characters: [], particles: null,
     currentWordIndex: 0, words: [], sentences: [], animationFrame: null,
@@ -1020,6 +1020,19 @@ function createSparkles() {
 
 // TTS
 let lastSpokenSentence = -1;
+let englishVoice = null;
+
+function getEnglishVoice() {
+    if (englishVoice) return englishVoice;
+    const voices = state.speechSynth?.getVoices() || [];
+    // Try to find an English voice
+    englishVoice = voices.find(v => v.lang.startsWith('en-US'))
+        || voices.find(v => v.lang.startsWith('en-GB'))
+        || voices.find(v => v.lang.startsWith('en'))
+        || voices[0];
+    return englishVoice;
+}
+
 function speakText(text) {
     if (!state.speechSynth || !text || !state.ttsEnabled) return;
 
@@ -1037,11 +1050,17 @@ function speakText(text) {
 
     state.speechSynth.cancel();
     const utterance = new SpeechSynthesisUtterance(chunk);
-    utterance.rate = state.readingSpeed * 1.2;
+
+    // Explicitly set English
+    utterance.lang = 'en-US';
+    const voice = getEnglishVoice();
+    if (voice) utterance.voice = voice;
+
+    utterance.rate = Math.max(0.5, state.readingSpeed);
     utterance.pitch = 1;
     utterance.volume = 1;
     state.speechSynth.speak(utterance);
-    console.log('Speaking:', chunk);
+    console.log('Speaking (en-US):', chunk);
 }
 
 function speakWord(word) {
