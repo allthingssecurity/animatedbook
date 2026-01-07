@@ -56,7 +56,7 @@ const characterPresets = {
         { name: 'Max', bodyColor: [0.3, 0.5, 0.65], skinColor: [0.9, 0.75, 0.65], hairColor: [0.2, 0.12, 0.08], hairStyle: 'short', hasGlasses: false, hasBeard: false }
     ],
     leader: [
-        { name: 'Leader', bodyColor: [0.95, 0.55, 0.2], skinColor: [0.78, 0.6, 0.45], hairColor: [0.85, 0.85, 0.85], hairStyle: 'short', hasGlasses: true, hasBeard: true },
+        { name: 'Leader', bodyColor: [0.95, 0.55, 0.2], skinColor: [0.78, 0.6, 0.45], hairColor: [0.85, 0.85, 0.85], hairStyle: 'short', hasGlasses: false, hasBeard: false, faceTexture: 'leader-face.png' },
         { name: 'Assistant', bodyColor: [0.3, 0.4, 0.55], skinColor: [0.9, 0.75, 0.65], hairColor: [0.15, 0.1, 0.08], hairStyle: 'short', hasGlasses: false, hasBeard: false }
     ],
     kids: [
@@ -95,6 +95,11 @@ class AnimatedCharacter {
         // Head
         this.parts.head = this.createPart('sphere', c.skinColor, [0.35, 0.4, 0.35], [0, 1.1, 0]);
 
+        // Face photo texture for Leader
+        if (c.faceTexture) {
+            this.loadFaceTexture(c.faceTexture);
+        }
+
         // Hair
         if (c.hairStyle === 'long') {
             this.parts.hair = this.createPart('sphere', c.hairColor, [0.38, 0.32, 0.38], [0, 1.25, -0.02]);
@@ -104,15 +109,17 @@ class AnimatedCharacter {
             this.parts.hair = this.createPart('box', c.hairColor, [0.32, 0.12, 0.32], [0, 1.28, 0]);
         }
 
-        // Face
-        this.parts.leftEye = this.createPart('sphere', new pc.Color(1, 1, 1), [0.08, 0.08, 0.04], [-0.08, 1.12, 0.16]);
-        this.parts.rightEye = this.createPart('sphere', new pc.Color(1, 1, 1), [0.08, 0.08, 0.04], [0.08, 1.12, 0.16]);
-        this.parts.leftPupil = this.createPart('sphere', new pc.Color(0.1, 0.1, 0.1), [0.04, 0.04, 0.02], [-0.08, 1.12, 0.19]);
-        this.parts.rightPupil = this.createPart('sphere', new pc.Color(0.1, 0.1, 0.1), [0.04, 0.04, 0.02], [0.08, 1.12, 0.19]);
-        this.parts.mouth = this.createPart('box', new pc.Color(0.8, 0.4, 0.4), [0.1, 0.02, 0.02], [0, 1.0, 0.17]);
+        // Face - hide eyes/mouth if using face texture
+        if (!c.faceTexture) {
+            this.parts.leftEye = this.createPart('sphere', new pc.Color(1, 1, 1), [0.08, 0.08, 0.04], [-0.08, 1.12, 0.16]);
+            this.parts.rightEye = this.createPart('sphere', new pc.Color(1, 1, 1), [0.08, 0.08, 0.04], [0.08, 1.12, 0.16]);
+            this.parts.leftPupil = this.createPart('sphere', new pc.Color(0.1, 0.1, 0.1), [0.04, 0.04, 0.02], [-0.08, 1.12, 0.19]);
+            this.parts.rightPupil = this.createPart('sphere', new pc.Color(0.1, 0.1, 0.1), [0.04, 0.04, 0.02], [0.08, 1.12, 0.19]);
+            this.parts.mouth = this.createPart('box', new pc.Color(0.8, 0.4, 0.4), [0.1, 0.02, 0.02], [0, 1.0, 0.17]);
+        }
 
         // Beard (for Leader character)
-        if (c.hasBeard) {
+        if (c.hasBeard && !c.faceTexture) {
             // Full beard covering chin and jaw
             this.parts.beard = this.createPart('sphere', c.hairColor, [0.32, 0.22, 0.2], [0, 0.92, 0.08]);
             this.parts.beardChin = this.createPart('sphere', c.hairColor, [0.2, 0.15, 0.15], [0, 0.85, 0.1]);
@@ -163,6 +170,46 @@ class AnimatedCharacter {
         entity.setLocalPosition(pos[0], pos[1], pos[2]);
         this.root.addChild(entity);
         return entity;
+    }
+
+    loadFaceTexture(textureUrl) {
+        // Create a face plane in front of the head
+        const facePlane = new pc.Entity('facePlane');
+        facePlane.addComponent('render', { type: 'plane' });
+        facePlane.setLocalPosition(0, 1.1, 0.18);
+        facePlane.setLocalScale(0.32, 0.32, 1);
+        facePlane.setEulerAngles(90, 0, 0);
+
+        // Load the texture
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            const texture = new pc.Texture(this.app.graphicsDevice, {
+                width: img.width,
+                height: img.height,
+                format: pc.PIXELFORMAT_RGBA8
+            });
+            texture.setSource(img);
+            texture.minFilter = pc.FILTER_LINEAR;
+            texture.magFilter = pc.FILTER_LINEAR;
+
+            const mat = new pc.StandardMaterial();
+            mat.diffuseMap = texture;
+            mat.emissiveMap = texture;
+            mat.emissive = new pc.Color(0.3, 0.3, 0.3);
+            mat.opacityMap = texture;
+            mat.opacity = 1;
+            mat.blendType = pc.BLEND_NORMAL;
+            mat.cull = pc.CULLFACE_NONE;
+            mat.update();
+
+            facePlane.render.meshInstances[0].material = mat;
+            console.log('Face texture loaded:', textureUrl);
+        };
+        img.src = textureUrl;
+
+        this.root.addChild(facePlane);
+        this.parts.facePlane = facePlane;
     }
 
     update(dt) {
@@ -592,7 +639,8 @@ function createCharacters(app) {
         hairColor: new pc.Color(preset1.hairColor[0], preset1.hairColor[1], preset1.hairColor[2]),
         hairStyle: preset1.hairStyle,
         hasGlasses: preset1.hasGlasses,
-        hasBeard: preset1.hasBeard || false
+        hasBeard: preset1.hasBeard || false,
+        faceTexture: preset1.faceTexture || null
     });
     state.characters.push(char1);
 
@@ -607,7 +655,8 @@ function createCharacters(app) {
         hairColor: new pc.Color(preset2.hairColor[0], preset2.hairColor[1], preset2.hairColor[2]),
         hairStyle: preset2.hairStyle,
         hasGlasses: preset2.hasGlasses,
-        hasBeard: preset2.hasBeard || false
+        hasBeard: preset2.hasBeard || false,
+        faceTexture: preset2.faceTexture || null
     });
     state.characters.push(char2);
 }
