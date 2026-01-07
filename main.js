@@ -9,9 +9,10 @@ import * as pc from 'playcanvas';
 const state = {
     app: null, pdfDoc: null, pages: [], currentPage: 0, totalPages: 0,
     isPlaying: false, isReading: false, readingSpeed: 1, autoFlip: true,
-    discussionMode: true, autoplayOnLoad: true, bookEntity: null, characters: [], particles: null,
+    discussionMode: true, autoplayOnLoad: true, ttsEnabled: false, characterStyle: 'default',
+    bookEntity: null, characters: [], particles: null,
     currentWordIndex: 0, words: [], sentences: [], animationFrame: null,
-    camera: null, time: 0
+    camera: null, time: 0, speechSynth: null, currentUtterance: null
 };
 
 // DOM Elements
@@ -937,6 +938,11 @@ function animateReading() {
         }
 
         document.getElementById('progress-fill').style.width = `${(state.currentWordIndex / state.words.length) * 100}%`;
+
+        // Speak word with TTS if enabled
+        if (state.ttsEnabled && state.speechSynth) {
+            speakWord(state.words[state.currentWordIndex]);
+        }
     }
 
     state.currentWordIndex++;
@@ -976,9 +982,76 @@ function createSparkles() {
     }
 }
 
+// TTS
+function speakWord(word) {
+    if (!state.speechSynth || !word) return;
+    state.speechSynth.cancel();
+    const utterance = new SpeechSynthesisUtterance(word);
+    utterance.rate = state.readingSpeed;
+    utterance.pitch = 1;
+    utterance.volume = 0.8;
+    state.speechSynth.speak(utterance);
+}
+
+// Character styles
+const characterPresets = {
+    default: [
+        { name: 'Lily', bodyColor: [0.5, 0.3, 0.6], skinColor: [0.95, 0.8, 0.72], hairColor: [0.25, 0.15, 0.1], hairStyle: 'long', hasGlasses: true },
+        { name: 'Max', bodyColor: [0.3, 0.5, 0.65], skinColor: [0.9, 0.75, 0.65], hairColor: [0.2, 0.12, 0.08], hairStyle: 'short', hasGlasses: false }
+    ],
+    leader: [
+        { name: 'Leader', bodyColor: [0.95, 0.55, 0.2], skinColor: [0.85, 0.7, 0.55], hairColor: [0.85, 0.85, 0.85], hairStyle: 'short', hasGlasses: true, hasBeard: true },
+        { name: 'Assistant', bodyColor: [0.3, 0.4, 0.55], skinColor: [0.9, 0.75, 0.65], hairColor: [0.15, 0.1, 0.08], hairStyle: 'short', hasGlasses: false }
+    ],
+    kids: [
+        { name: 'Mia', bodyColor: [1, 0.6, 0.7], skinColor: [0.95, 0.82, 0.75], hairColor: [0.3, 0.2, 0.1], hairStyle: 'long', hasGlasses: false },
+        { name: 'Leo', bodyColor: [0.4, 0.7, 0.5], skinColor: [0.88, 0.72, 0.6], hairColor: [0.2, 0.15, 0.1], hairStyle: 'short', hasGlasses: false }
+    ]
+};
+
+function updateCharacterStyle(style) {
+    const presets = characterPresets[style] || characterPresets.default;
+
+    // Update reader card emojis
+    const emojiMap = {
+        default: ['👩‍🏫', '👨‍🎓'],
+        leader: ['🧔', '👨‍💼'],
+        kids: ['👧', '👦']
+    };
+    const emojis = emojiMap[style] || emojiMap.default;
+    document.querySelector('#reader-card-1 .reader-emoji').textContent = emojis[0];
+    document.querySelector('#reader-card-2 .reader-emoji').textContent = emojis[1];
+    document.querySelector('#reader-card-1 .reader-name').textContent = presets[0].name;
+    document.querySelector('#reader-card-2 .reader-name').textContent = presets[1].name;
+
+    // Update 3D characters colors
+    if (state.characters.length >= 2) {
+        for (let i = 0; i < 2; i++) {
+            const char = state.characters[i];
+            const preset = presets[i];
+            if (char.parts.body?.render) {
+                const mat = char.parts.body.render.meshInstances[0].material;
+                mat.diffuse = new pc.Color(preset.bodyColor[0], preset.bodyColor[1], preset.bodyColor[2]);
+                mat.update();
+            }
+            if (char.parts.hair?.render) {
+                const mat = char.parts.hair.render.meshInstances[0].material;
+                mat.diffuse = new pc.Color(preset.hairColor[0], preset.hairColor[1], preset.hairColor[2]);
+                mat.update();
+            }
+        }
+    }
+}
+
 // Controls
 function startReading() { state.isPlaying = true; els.playIcon.textContent = '⏸'; startVisualReading(); }
-function pauseReading() { state.isPlaying = false; state.isReading = false; els.playIcon.textContent = '▶'; if (state.animationFrame) clearTimeout(state.animationFrame); state.characters.forEach(c => { c.stopTalking(); c.stopPointing(); }); }
+function pauseReading() {
+    state.isPlaying = false; state.isReading = false;
+    els.playIcon.textContent = '▶';
+    if (state.animationFrame) clearTimeout(state.animationFrame);
+    state.characters.forEach(c => { c.stopTalking(); c.stopPointing(); });
+    if (state.speechSynth) state.speechSynth.cancel();
+}
 function stopReading() {
     pauseReading();
     document.querySelectorAll('.word').forEach(w => w.classList.remove('current', 'read', 'visible'));
@@ -1007,12 +1080,25 @@ function setupEvents() {
     els.newBookBtn.addEventListener('click', () => { stopReading(); state.pdfDoc = null; state.pages = []; state.currentPage = 0; els.welcomePanel.classList.remove('hidden'); els.readingControls.classList.add('hidden'); });
 
     // Settings toggles
+    const ttsEl = document.getElementById('tts-enabled');
     const autoplayEl = document.getElementById('autoplay-on-load');
     const autoFlipEl = document.getElementById('auto-flip');
     const discussionEl = document.getElementById('discussion-mode');
+    const charStyleEl = document.getElementById('character-style');
+
+    if (ttsEl) ttsEl.addEventListener('change', e => {
+        state.ttsEnabled = e.target.checked;
+        if (!state.ttsEnabled && state.speechSynth) {
+            state.speechSynth.cancel();
+        }
+    });
     if (autoplayEl) autoplayEl.addEventListener('change', e => state.autoplayOnLoad = e.target.checked);
     if (autoFlipEl) autoFlipEl.addEventListener('change', e => state.autoFlip = e.target.checked);
     if (discussionEl) discussionEl.addEventListener('change', e => state.discussionMode = e.target.checked);
+    if (charStyleEl) charStyleEl.addEventListener('change', e => {
+        state.characterStyle = e.target.value;
+        updateCharacterStyle(e.target.value);
+    });
 
     // Theme buttons
     document.querySelectorAll('.theme-btn').forEach(btn => {
@@ -1022,6 +1108,9 @@ function setupEvents() {
             updateSceneTheme(btn.dataset.theme);
         });
     });
+
+    // Init speech synthesis
+    state.speechSynth = window.speechSynthesis;
 
     document.addEventListener('keydown', e => {
         if (!els.welcomePanel.classList.contains('hidden')) return;
@@ -1038,10 +1127,10 @@ function updateSceneTheme(theme) {
     const themes = {
         library: { bg: new pc.Color(0.05, 0.03, 0.08), key: new pc.Color(1, 0.9, 0.7), rim1: new pc.Color(0.4, 0.6, 1), rim2: new pc.Color(1, 0.5, 0.7) },
         cozy: { bg: new pc.Color(0.1, 0.06, 0.04), key: new pc.Color(1, 0.7, 0.4), rim1: new pc.Color(1, 0.6, 0.3), rim2: new pc.Color(0.9, 0.4, 0.2) },
-        nature: { bg: new pc.Color(0.02, 0.06, 0.04), key: new pc.Color(0.9, 1, 0.8), rim1: new pc.Color(0.4, 0.9, 0.5), rim2: new pc.Color(0.3, 0.7, 0.9) },
-        sunset: { bg: new pc.Color(0.12, 0.04, 0.06), key: new pc.Color(1, 0.6, 0.3), rim1: new pc.Color(1, 0.4, 0.2), rim2: new pc.Color(1, 0.7, 0.4) },
-        ocean: { bg: new pc.Color(0.02, 0.05, 0.1), key: new pc.Color(0.6, 0.9, 1), rim1: new pc.Color(0.2, 0.6, 0.9), rim2: new pc.Color(0.3, 0.8, 0.8) },
-        midnight: { bg: new pc.Color(0.02, 0.02, 0.06), key: new pc.Color(0.5, 0.5, 0.8), rim1: new pc.Color(0.3, 0.3, 0.8), rim2: new pc.Color(0.6, 0.3, 0.7) }
+        nature: { bg: new pc.Color(0.1, 0.15, 0.1), key: new pc.Color(0.9, 1, 0.8), rim1: new pc.Color(0.4, 0.9, 0.5), rim2: new pc.Color(0.3, 0.7, 0.9) },
+        bright: { bg: new pc.Color(0.9, 0.92, 0.95), key: new pc.Color(1, 1, 0.95), rim1: new pc.Color(1, 0.9, 0.7), rim2: new pc.Color(0.9, 0.95, 1) },
+        cream: { bg: new pc.Color(0.95, 0.92, 0.85), key: new pc.Color(1, 0.95, 0.85), rim1: new pc.Color(1, 0.85, 0.7), rim2: new pc.Color(0.95, 0.9, 0.8) },
+        sky: { bg: new pc.Color(0.7, 0.85, 0.95), key: new pc.Color(1, 1, 0.98), rim1: new pc.Color(0.8, 0.9, 1), rim2: new pc.Color(1, 0.95, 0.9) }
     };
 
     const t = themes[theme] || themes.library;

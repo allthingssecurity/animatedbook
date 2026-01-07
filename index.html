@@ -181,6 +181,13 @@
                         </select>
                     </div>
                     <div class="setting-group">
+                        <label>🔊 Voice Narration</label>
+                        <label class="toggle">
+                            <input type="checkbox" id="tts-enabled">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-group">
                         <label>▶️ Autoplay on Load</label>
                         <label class="toggle">
                             <input type="checkbox" id="autoplay-on-load" checked>
@@ -202,14 +209,22 @@
                         </label>
                     </div>
                     <div class="setting-group">
+                        <label>Character Style</label>
+                        <select id="character-style">
+                            <option value="default">👩‍🏫 Teacher & Student</option>
+                            <option value="leader">🧔 Leader & Assistant</option>
+                            <option value="kids">👧 Kids</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
                         <label>Scene Theme</label>
                         <div class="theme-selector">
                             <button class="theme-btn active" data-theme="library">🏛️ Library</button>
                             <button class="theme-btn" data-theme="cozy">🏠 Cozy</button>
                             <button class="theme-btn" data-theme="nature">🌳 Nature</button>
-                            <button class="theme-btn" data-theme="sunset">🌅 Sunset</button>
-                            <button class="theme-btn" data-theme="ocean">🌊 Ocean</button>
-                            <button class="theme-btn" data-theme="midnight">🌙 Midnight</button>
+                            <button class="theme-btn" data-theme="bright">☀️ Bright</button>
+                            <button class="theme-btn" data-theme="cream">📜 Cream</button>
+                            <button class="theme-btn" data-theme="sky">�️ Sky</button>
                         </div>
                     </div>
                 </div>
