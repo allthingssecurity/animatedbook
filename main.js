@@ -983,14 +983,33 @@ function createSparkles() {
 }
 
 // TTS
-function speakWord(word) {
-    if (!state.speechSynth || !word) return;
+let lastSpokenSentence = -1;
+function speakText(text) {
+    if (!state.speechSynth || !text || !state.ttsEnabled) return;
+
+    // Don't re-speak the same sentence
+    const sentenceIndex = Math.floor(state.currentWordIndex / 10);
+    if (sentenceIndex === lastSpokenSentence) return;
+    lastSpokenSentence = sentenceIndex;
+
+    // Get a chunk of words to speak
+    const startIdx = state.currentWordIndex;
+    const endIdx = Math.min(startIdx + 10, state.words.length);
+    const chunk = state.words.slice(startIdx, endIdx).join(' ');
+
+    if (!chunk.trim()) return;
+
     state.speechSynth.cancel();
-    const utterance = new SpeechSynthesisUtterance(word);
-    utterance.rate = state.readingSpeed;
+    const utterance = new SpeechSynthesisUtterance(chunk);
+    utterance.rate = state.readingSpeed * 1.2;
     utterance.pitch = 1;
-    utterance.volume = 0.8;
+    utterance.volume = 1;
     state.speechSynth.speak(utterance);
+    console.log('Speaking:', chunk);
+}
+
+function speakWord(word) {
+    speakText(word);
 }
 
 // Character styles
@@ -1124,25 +1143,61 @@ function setupEvents() {
 function updateSceneTheme(theme) {
     if (!state.app || !state.camera) return;
 
+    const isLight = ['bright', 'cream', 'sky'].includes(theme);
+
     const themes = {
-        library: { bg: new pc.Color(0.05, 0.03, 0.08), key: new pc.Color(1, 0.9, 0.7), rim1: new pc.Color(0.4, 0.6, 1), rim2: new pc.Color(1, 0.5, 0.7) },
-        cozy: { bg: new pc.Color(0.1, 0.06, 0.04), key: new pc.Color(1, 0.7, 0.4), rim1: new pc.Color(1, 0.6, 0.3), rim2: new pc.Color(0.9, 0.4, 0.2) },
-        nature: { bg: new pc.Color(0.1, 0.15, 0.1), key: new pc.Color(0.9, 1, 0.8), rim1: new pc.Color(0.4, 0.9, 0.5), rim2: new pc.Color(0.3, 0.7, 0.9) },
-        bright: { bg: new pc.Color(0.9, 0.92, 0.95), key: new pc.Color(1, 1, 0.95), rim1: new pc.Color(1, 0.9, 0.7), rim2: new pc.Color(0.9, 0.95, 1) },
-        cream: { bg: new pc.Color(0.95, 0.92, 0.85), key: new pc.Color(1, 0.95, 0.85), rim1: new pc.Color(1, 0.85, 0.7), rim2: new pc.Color(0.95, 0.9, 0.8) },
-        sky: { bg: new pc.Color(0.7, 0.85, 0.95), key: new pc.Color(1, 1, 0.98), rim1: new pc.Color(0.8, 0.9, 1), rim2: new pc.Color(1, 0.95, 0.9) }
+        library: { bg: new pc.Color(0.05, 0.03, 0.08), ambient: new pc.Color(0.15, 0.1, 0.2), key: new pc.Color(1, 0.9, 0.7), keyIntensity: 1.5 },
+        cozy: { bg: new pc.Color(0.1, 0.06, 0.04), ambient: new pc.Color(0.2, 0.12, 0.08), key: new pc.Color(1, 0.7, 0.4), keyIntensity: 1.5 },
+        nature: { bg: new pc.Color(0.1, 0.15, 0.1), ambient: new pc.Color(0.15, 0.2, 0.12), key: new pc.Color(0.9, 1, 0.8), keyIntensity: 1.5 },
+        bright: { bg: new pc.Color(0.92, 0.94, 0.98), ambient: new pc.Color(0.9, 0.9, 0.95), key: new pc.Color(1, 1, 1), keyIntensity: 2.5 },
+        cream: { bg: new pc.Color(0.96, 0.94, 0.88), ambient: new pc.Color(0.9, 0.85, 0.8), key: new pc.Color(1, 0.98, 0.9), keyIntensity: 2.5 },
+        sky: { bg: new pc.Color(0.75, 0.88, 0.98), ambient: new pc.Color(0.8, 0.88, 0.95), key: new pc.Color(1, 1, 0.98), keyIntensity: 2.5 }
     };
 
     const t = themes[theme] || themes.library;
+
+    // Update background
     state.camera.camera.clearColor = t.bg;
 
-    const keyLight = state.app.root.findByName('keyLight');
-    const rimLight1 = state.app.root.findByName('rimLight1');
-    const rimLight2 = state.app.root.findByName('rimLight2');
+    // Update ambient light
+    state.app.scene.ambientLight = t.ambient;
 
-    if (keyLight?.light) keyLight.light.color = t.key;
-    if (rimLight1?.light) rimLight1.light.color = t.rim1;
-    if (rimLight2?.light) rimLight2.light.color = t.rim2;
+    // Update key light
+    const keyLight = state.app.root.findByName('keyLight');
+    if (keyLight?.light) {
+        keyLight.light.color = t.key;
+        keyLight.light.intensity = t.keyIntensity;
+    }
+
+    // Update floor and table for light themes
+    const floor = state.app.root.findByName('floor');
+    const table = state.app.root.findByName('table');
+
+    if (floor?.render) {
+        const floorMat = floor.render.meshInstances[0].material;
+        if (isLight) {
+            floorMat.diffuse = new pc.Color(0.85, 0.82, 0.78);
+            floorMat.emissive = new pc.Color(0.3, 0.28, 0.25);
+        } else {
+            floorMat.diffuse = new pc.Color(0.15, 0.1, 0.08);
+            floorMat.emissive = new pc.Color(0.05, 0.03, 0.02);
+        }
+        floorMat.update();
+    }
+
+    if (table?.render) {
+        const tableMat = table.render.meshInstances[0].material;
+        if (isLight) {
+            tableMat.diffuse = new pc.Color(0.7, 0.55, 0.4);
+            tableMat.emissive = new pc.Color(0.2, 0.15, 0.1);
+        } else {
+            tableMat.diffuse = new pc.Color(0.3, 0.2, 0.12);
+            tableMat.emissive = new pc.Color(0.05, 0.03, 0.02);
+        }
+        tableMat.update();
+    }
+
+    console.log('Theme changed to:', theme, isLight ? '(light)' : '(dark)');
 }
 
 // Init
