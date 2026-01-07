@@ -719,6 +719,34 @@ function addDynamicStyles() {
         @keyframes floatWord { 0% { opacity: 0; transform: translateY(0) scale(0.5) rotate(-5deg); } 20% { opacity: 1; transform: translateY(-30px) scale(1.2) rotate(0deg); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-200px) scale(0.8) rotate(5deg); } }
         .sparkle { position: absolute; width: 10px; height: 10px; background: white; border-radius: 50%; animation: sparkle 1s ease-out forwards; }
         @keyframes sparkle { 0% { opacity: 1; transform: scale(0); } 50% { opacity: 1; transform: scale(1.5); } 100% { opacity: 0; transform: scale(0); } }
+        
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            #text-stage { top: 100px; left: 10px; right: 10px; bottom: 85px; padding: 5px; }
+            .reader-indicators { margin-bottom: 8px; }
+            .reader-card { padding: 6px 12px; gap: 6px; border-radius: 30px; }
+            .reader-emoji { font-size: 1.4rem; }
+            .reader-name { font-size: 0.75rem; }
+            .reader-status { font-size: 0.65rem; }
+            .text-stage-panel { padding: 14px 16px; border-radius: 16px; }
+            .text-content { font-size: 1rem; line-height: 1.75; }
+            .text-content .word { padding: 2px 4px; margin: 1px; font-size: 0.95rem; }
+            .text-content .word.current { transform: scale(1.08); }
+            .progress-track { height: 4px; margin-top: 10px; }
+            .floating-word { font-size: 1.2rem; }
+        }
+        
+        @media (max-width: 480px) {
+            #text-stage { top: 95px; left: 6px; right: 6px; bottom: 80px; }
+            .reader-card { padding: 5px 10px; }
+            .reader-emoji { font-size: 1.2rem; }
+            .reader-info { gap: 0; }
+            .reader-name { font-size: 0.7rem; }
+            .reader-status { font-size: 0.6rem; }
+            .text-stage-panel { padding: 12px 14px; border-radius: 14px; }
+            .text-content { font-size: 0.9rem; line-height: 1.7; }
+            .text-content .word { padding: 2px 3px; font-size: 0.88rem; }
+        }
     `;
     document.head.appendChild(s);
 }
