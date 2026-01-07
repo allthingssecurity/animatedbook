@@ -49,6 +49,22 @@ const els = {
 const pdfjsLib = window['pdfjsLib'];
 if (pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
+// Character style presets
+const characterPresets = {
+    default: [
+        { name: 'Lily', bodyColor: [0.5, 0.3, 0.6], skinColor: [0.95, 0.8, 0.72], hairColor: [0.25, 0.15, 0.1], hairStyle: 'long', hasGlasses: true, hasBeard: false },
+        { name: 'Max', bodyColor: [0.3, 0.5, 0.65], skinColor: [0.9, 0.75, 0.65], hairColor: [0.2, 0.12, 0.08], hairStyle: 'short', hasGlasses: false, hasBeard: false }
+    ],
+    leader: [
+        { name: 'Leader', bodyColor: [0.95, 0.55, 0.2], skinColor: [0.78, 0.6, 0.45], hairColor: [0.85, 0.85, 0.85], hairStyle: 'short', hasGlasses: true, hasBeard: true },
+        { name: 'Assistant', bodyColor: [0.3, 0.4, 0.55], skinColor: [0.9, 0.75, 0.65], hairColor: [0.15, 0.1, 0.08], hairStyle: 'short', hasGlasses: false, hasBeard: false }
+    ],
+    kids: [
+        { name: 'Mia', bodyColor: [1, 0.6, 0.7], skinColor: [0.95, 0.82, 0.75], hairColor: [0.3, 0.2, 0.1], hairStyle: 'long', hasGlasses: false, hasBeard: false },
+        { name: 'Leo', bodyColor: [0.4, 0.7, 0.5], skinColor: [0.88, 0.72, 0.6], hairColor: [0.2, 0.15, 0.1], hairStyle: 'short', hasGlasses: false, hasBeard: false }
+    ]
+};
+
 // Character class for animated figures
 class AnimatedCharacter {
     constructor(app, config) {
@@ -95,6 +111,15 @@ class AnimatedCharacter {
         this.parts.rightPupil = this.createPart('sphere', new pc.Color(0.1, 0.1, 0.1), [0.04, 0.04, 0.02], [0.08, 1.12, 0.19]);
         this.parts.mouth = this.createPart('box', new pc.Color(0.8, 0.4, 0.4), [0.1, 0.02, 0.02], [0, 1.0, 0.17]);
 
+        // Beard (for Leader character)
+        if (c.hasBeard) {
+            // Full beard covering chin and jaw
+            this.parts.beard = this.createPart('sphere', c.hairColor, [0.32, 0.22, 0.2], [0, 0.92, 0.08]);
+            this.parts.beardChin = this.createPart('sphere', c.hairColor, [0.2, 0.15, 0.15], [0, 0.85, 0.1]);
+            // Mustache
+            this.parts.mustache = this.createPart('box', c.hairColor, [0.18, 0.04, 0.06], [0, 1.02, 0.17]);
+        }
+
         // Arms
         const armX = c.side === 'left' ? 0.28 : -0.28;
         this.parts.leftArm = this.createPart('cylinder', c.skinColor, [0.06, 0.35, 0.06], [-0.28, 0.55, 0]);
@@ -107,16 +132,21 @@ class AnimatedCharacter {
         this.parts.rightHand = this.createPart('sphere', c.skinColor, [0.06, 0.06, 0.06], [0.35, 0.3, 0]);
 
         // Legs
-        this.parts.leftLeg = this.createPart('cylinder', new pc.Color(0.2, 0.2, 0.3), [0.08, 0.35, 0.08], [-0.12, -0.15, 0]);
-        this.parts.rightLeg = this.createPart('cylinder', new pc.Color(0.2, 0.2, 0.3), [0.08, 0.35, 0.08], [0.12, -0.15, 0]);
+        this.parts.leftLeg = this.createPart('cylinder', new pc.Color(0.95, 0.95, 0.95), [0.08, 0.35, 0.08], [-0.12, -0.15, 0]);
+        this.parts.rightLeg = this.createPart('cylinder', new pc.Color(0.95, 0.95, 0.95), [0.08, 0.35, 0.08], [0.12, -0.15, 0]);
 
         // Feet
         this.parts.leftFoot = this.createPart('box', new pc.Color(0.3, 0.2, 0.15), [0.08, 0.04, 0.12], [-0.12, -0.35, 0.02]);
         this.parts.rightFoot = this.createPart('box', new pc.Color(0.3, 0.2, 0.15), [0.08, 0.04, 0.12], [0.12, -0.35, 0.02]);
 
-        // Accessories
+        // Glasses (improved for Leader look)
         if (c.hasGlasses) {
-            this.parts.glasses = this.createPart('box', new pc.Color(0.1, 0.1, 0.1), [0.28, 0.02, 0.02], [0, 1.12, 0.18]);
+            // Frame
+            this.parts.glassFrame = this.createPart('box', new pc.Color(0.15, 0.1, 0.05), [0.32, 0.025, 0.02], [0, 1.12, 0.18]);
+            // Left lens
+            this.parts.leftLens = this.createPart('box', new pc.Color(0.3, 0.35, 0.4), [0.1, 0.08, 0.01], [-0.08, 1.12, 0.19]);
+            // Right lens
+            this.parts.rightLens = this.createPart('box', new pc.Color(0.3, 0.35, 0.4), [0.1, 0.08, 0.01], [0.08, 1.12, 0.19]);
         }
     }
 
@@ -547,33 +577,39 @@ function createBook(app) {
 }
 
 function createCharacters(app) {
-    // Professor Lily - elegant teacher
-    const lily = new AnimatedCharacter(app, {
-        name: 'Lily',
+    // Get the preset based on current character style
+    const preset1 = characterPresets[state.characterStyle]?.[0] || characterPresets.default[0];
+    const preset2 = characterPresets[state.characterStyle]?.[1] || characterPresets.default[1];
+
+    // Character 1 (left side)
+    const char1 = new AnimatedCharacter(app, {
+        name: preset1.name,
         position: { x: -1.8, y: 0, z: 1.2 },
         rotation: 25,
         side: 'left',
-        bodyColor: new pc.Color(0.5, 0.3, 0.6),
-        skinColor: new pc.Color(0.95, 0.8, 0.72),
-        hairColor: new pc.Color(0.25, 0.15, 0.1),
-        hairStyle: 'long',
-        hasGlasses: true
+        bodyColor: new pc.Color(preset1.bodyColor[0], preset1.bodyColor[1], preset1.bodyColor[2]),
+        skinColor: new pc.Color(preset1.skinColor[0], preset1.skinColor[1], preset1.skinColor[2]),
+        hairColor: new pc.Color(preset1.hairColor[0], preset1.hairColor[1], preset1.hairColor[2]),
+        hairStyle: preset1.hairStyle,
+        hasGlasses: preset1.hasGlasses,
+        hasBeard: preset1.hasBeard || false
     });
-    state.characters.push(lily);
+    state.characters.push(char1);
 
-    // Max - enthusiastic student
-    const max = new AnimatedCharacter(app, {
-        name: 'Max',
+    // Character 2 (right side)
+    const char2 = new AnimatedCharacter(app, {
+        name: preset2.name,
         position: { x: 1.8, y: 0, z: 1.2 },
         rotation: -25,
         side: 'right',
-        bodyColor: new pc.Color(0.3, 0.5, 0.65),
-        skinColor: new pc.Color(0.9, 0.75, 0.65),
-        hairColor: new pc.Color(0.2, 0.12, 0.08),
-        hairStyle: 'short',
-        hasGlasses: false
+        bodyColor: new pc.Color(preset2.bodyColor[0], preset2.bodyColor[1], preset2.bodyColor[2]),
+        skinColor: new pc.Color(preset2.skinColor[0], preset2.skinColor[1], preset2.skinColor[2]),
+        hairColor: new pc.Color(preset2.hairColor[0], preset2.hairColor[1], preset2.hairColor[2]),
+        hairStyle: preset2.hairStyle,
+        hasGlasses: preset2.hasGlasses,
+        hasBeard: preset2.hasBeard || false
     });
-    state.characters.push(max);
+    state.characters.push(char2);
 }
 
 function createMagicParticles(app) {
@@ -1012,22 +1048,6 @@ function speakWord(word) {
     speakText(word);
 }
 
-// Character styles
-const characterPresets = {
-    default: [
-        { name: 'Lily', bodyColor: [0.5, 0.3, 0.6], skinColor: [0.95, 0.8, 0.72], hairColor: [0.25, 0.15, 0.1], hairStyle: 'long', hasGlasses: true },
-        { name: 'Max', bodyColor: [0.3, 0.5, 0.65], skinColor: [0.9, 0.75, 0.65], hairColor: [0.2, 0.12, 0.08], hairStyle: 'short', hasGlasses: false }
-    ],
-    leader: [
-        { name: 'Leader', bodyColor: [0.95, 0.55, 0.2], skinColor: [0.85, 0.7, 0.55], hairColor: [0.85, 0.85, 0.85], hairStyle: 'short', hasGlasses: true, hasBeard: true },
-        { name: 'Assistant', bodyColor: [0.3, 0.4, 0.55], skinColor: [0.9, 0.75, 0.65], hairColor: [0.15, 0.1, 0.08], hairStyle: 'short', hasGlasses: false }
-    ],
-    kids: [
-        { name: 'Mia', bodyColor: [1, 0.6, 0.7], skinColor: [0.95, 0.82, 0.75], hairColor: [0.3, 0.2, 0.1], hairStyle: 'long', hasGlasses: false },
-        { name: 'Leo', bodyColor: [0.4, 0.7, 0.5], skinColor: [0.88, 0.72, 0.6], hairColor: [0.2, 0.15, 0.1], hairStyle: 'short', hasGlasses: false }
-    ]
-};
-
 function updateCharacterStyle(style) {
     const presets = characterPresets[style] || characterPresets.default;
 
@@ -1048,18 +1068,43 @@ function updateCharacterStyle(style) {
         for (let i = 0; i < 2; i++) {
             const char = state.characters[i];
             const preset = presets[i];
+
+            // Update body (kurta/vest)
             if (char.parts.body?.render) {
                 const mat = char.parts.body.render.meshInstances[0].material;
                 mat.diffuse = new pc.Color(preset.bodyColor[0], preset.bodyColor[1], preset.bodyColor[2]);
                 mat.update();
             }
+
+            // Update hair
             if (char.parts.hair?.render) {
                 const mat = char.parts.hair.render.meshInstances[0].material;
                 mat.diffuse = new pc.Color(preset.hairColor[0], preset.hairColor[1], preset.hairColor[2]);
                 mat.update();
             }
+
+            // Update skin (head)
+            if (char.parts.head?.render) {
+                const mat = char.parts.head.render.meshInstances[0].material;
+                mat.diffuse = new pc.Color(preset.skinColor[0], preset.skinColor[1], preset.skinColor[2]);
+                mat.update();
+            }
+
+            // Update beard/mustache if present
+            if (char.parts.beard?.render) {
+                const mat = char.parts.beard.render.meshInstances[0].material;
+                mat.diffuse = new pc.Color(preset.hairColor[0], preset.hairColor[1], preset.hairColor[2]);
+                mat.update();
+            }
+            if (char.parts.mustache?.render) {
+                const mat = char.parts.mustache.render.meshInstances[0].material;
+                mat.diffuse = new pc.Color(preset.hairColor[0], preset.hairColor[1], preset.hairColor[2]);
+                mat.update();
+            }
         }
     }
+
+    console.log('Character style updated to:', style);
 }
 
 // Controls
